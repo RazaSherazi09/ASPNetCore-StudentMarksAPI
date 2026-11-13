@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: marks-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: marks_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD environment variable}
+      POSTGRES_DB: marks_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marks_user -d marks_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  marks-api:
+    build:
+      context: ./src/MarksApi
+      dockerfile: Dockerfile
+    container_name: marks-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Database: "Host=postgres;Port=5432;Database=marks_db;Username=marks_user;Password=${DB_PASSWORD}"
+      Jwt__Key: "${JWT_KEY:?Set JWT_KEY environment variable (32+ chars)}"
+      Jwt__Issuer: "MarksApi"
+      Jwt__Audience: "MarksApiClients"
+      Jwt__LifetimeMinutes: "60"
+      Grading__PassMark: "50"
+      SmokeTest__TeacherUsername: "teacher1"
+      SmokeTest__TeacherPassword: "${SMOKE_TEACHER_PASSWORD}"
+      SmokeTest__StudentUsername: "student1"
+      SmokeTest__StudentPassword: "${SMOKE_STUDENT_PASSWORD}"
+    ports:
+      - "5123:8080"
+
+volumes:
+  pgdata:
+
